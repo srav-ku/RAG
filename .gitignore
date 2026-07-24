@@ -1,0 +1,6 @@
+# Python cache files - auto-generated, never needed in git
+__pycache__/
+*.pyc
+
+# Data folder - large files, not code
+data/
