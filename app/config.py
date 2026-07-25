@@ -1,17 +1,16 @@
 import os
 
 class Config:
-    # Root folder where our code lives (inside Colab, temporary)
+    # Code lives here (synced with GitHub)
     project_root = "/content/RAG"
 
-    # Where we'll store data — for now, still inside Colab.
-    # We'll move this to Google Drive in the next task so it survives restarts.
-    data_dir = os.path.join(project_root, "data")
+    # Data lives on Google Drive - survives Colab restarts
+    data_dir = "/content/drive/MyDrive/rag_platform_data"
     upload_dir = os.path.join(data_dir, "uploads")
     chroma_dir = os.path.join(data_dir, "chroma")
     sqlite_path = os.path.join(data_dir, "registry.db")
 
-    # Model names — one place to change if we upgrade later
+    # Model names
     embedding_model = "BAAI/bge-small-en-v1.5"
     llm_model = "Qwen/Qwen2.5-1.5B-Instruct"
     reranker_model = "BAAI/bge-reranker-base"
