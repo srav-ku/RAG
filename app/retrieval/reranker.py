@@ -3,7 +3,6 @@ from sentence_transformers import CrossEncoder
 from app.config import CONFIG
 from app.retrieval.retriever import RetrievedChunk
 
-# Singleton, same pattern as the embedder
 _reranker_model = None
 
 
@@ -20,24 +19,25 @@ def get_reranker() -> CrossEncoder:
 
 def rerank(query: str, chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
     """
-    Re-scores and reorders retrieved chunks based on how relevant each one
-    actually is to the specific query, using a cross-encoder model.
+    Re-scores and reorders retrieved chunks using a cross-encoder.
+    Raw model output is an unbounded logit, so we apply a sigmoid to
+    convert it into a stable, comparable 0-1 relevance score.
     """
     if not chunks:
         return []
 
     model = get_reranker()
-
-    # Build (query, chunk_text) pairs - the cross-encoder scores each pair together
     pairs = [(query, chunk.text) for chunk in chunks]
-    scores = model.predict(pairs)
 
-    # Attach the new scores to each chunk by overwriting `distance`
-    # (repurposed here as "rerank score" - higher now means MORE relevant,
-    # the opposite direction from ChromaDB's distance, so take care downstream)
-    for chunk, score in zip(chunks, scores):
+    # apply_softmax=False keeps raw logits; we normalize manually below
+    raw_scores = model.predict(pairs)
+
+    # Sigmoid: squashes any real number into a clean 0-1 range.
+    # sigmoid(x) = 1 / (1 + e^-x)
+    normalized_scores = [1 / (1 + torch.exp(torch.tensor(-s))) for s in raw_scores]
+
+    for chunk, score in zip(chunks, normalized_scores):
         chunk.distance = float(score)
 
-    # Sort by score descending - most relevant first
     reranked = sorted(chunks, key=lambda c: c.distance, reverse=True)
     return reranked
