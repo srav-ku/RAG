@@ -1,17 +1,20 @@
 import fitz  # PyMuPDF
 from dataclasses import dataclass
+from app.ingestion.ocr import is_scanned, run_ocr
 
 @dataclass
 class PageText:
     """Holds the extracted text for a single page."""
-    page_num: int   # 1-indexed, so page 1 is "page 1", not "page 0"
+    page_num: int
     text: str
+    was_ocr: bool = False  # tracks whether this page needed OCR (useful for debugging/stats)
 
-def parse_pdf(filepath: str) -> list[PageText]:
+
+def parse_pdf_smart(filepath: str) -> list[PageText]:
     """
-    Extracts text from a PDF, one page at a time.
-    Safe for large PDFs because we never hold the whole document's
-    rendered content in memory - only one page at a time during the loop.
+    Extracts text from a PDF, page by page.
+    For each page: tries normal text extraction first.
+    If the page looks scanned (too little text), falls back to OCR automatically.
     """
     pages = []
 
@@ -19,12 +22,30 @@ def parse_pdf(filepath: str) -> list[PageText]:
         print(f"[Parser] PDF has {len(doc)} pages. Starting extraction...")
 
         for index, page in enumerate(doc):
-            page_text = page.get_text()
-            pages.append(PageText(page_num=index + 1, text=page_text))
+            text = page.get_text()
+            used_ocr = False
 
-            # Progress feedback every 25 pages - important for large docs
+            if is_scanned(text):
+                text = run_ocr(page)
+                used_ocr = True
+
+            pages.append(PageText(page_num=index + 1, text=text, was_ocr=used_ocr))
+
             if (index + 1) % 25 == 0:
                 print(f"[Parser] Processed {index + 1}/{len(doc)} pages...")
 
-    print(f"[Parser] Done. Extracted {len(pages)} pages.")
+    ocr_count = sum(1 for p in pages if p.was_ocr)
+    print(f"[Parser] Done. {len(pages)} pages total, {ocr_count} needed OCR.")
     return pages
+
+
+def parse_document(filepath: str) -> list[PageText]:
+    """
+    Single entry point for parsing any supported document type.
+    Currently supports: PDF.
+    Future file types (.txt, .md, .docx) will be routed here too.
+    """
+    if filepath.lower().endswith(".pdf"):
+        return parse_pdf_smart(filepath)
+    else:
+        raise ValueError(f"Unsupported file type: {filepath}")
