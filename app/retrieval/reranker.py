@@ -20,23 +20,19 @@ def get_reranker() -> CrossEncoder:
 def rerank(query: str, chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
     """
     Re-scores and reorders retrieved chunks using a cross-encoder.
-    Raw model output is an unbounded logit, so we apply a sigmoid to
-    convert it into a stable, comparable 0-1 relevance score.
+    bge-reranker-base's CrossEncoder.predict() already returns scores
+    normalized to a 0-1 range internally (sigmoid applied by the library
+    itself for single-label models) - we use that directly, no extra
+    normalization needed.
     """
     if not chunks:
         return []
 
     model = get_reranker()
     pairs = [(query, chunk.text) for chunk in chunks]
+    scores = model.predict(pairs)
 
-    # apply_softmax=False keeps raw logits; we normalize manually below
-    raw_scores = model.predict(pairs)
-
-    # Sigmoid: squashes any real number into a clean 0-1 range.
-    # sigmoid(x) = 1 / (1 + e^-x)
-    normalized_scores = [1 / (1 + torch.exp(torch.tensor(-s))) for s in raw_scores]
-
-    for chunk, score in zip(chunks, normalized_scores):
+    for chunk, score in zip(chunks, scores):
         chunk.distance = float(score)
 
     reranked = sorted(chunks, key=lambda c: c.distance, reverse=True)
