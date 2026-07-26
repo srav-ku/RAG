@@ -5,25 +5,22 @@ from app.retrieval.vector_store import query_vectors
 
 @dataclass
 class RetrievedChunk:
-    """A single search result: the chunk text plus where it came from and how relevant it is."""
     text: str
-    distance: float          # lower = more similar
+    distance: float
     document_id: str
     filename: str
-    page_numbers: str        # comma-separated string, e.g. "3,4"
+    page_numbers: str
     chunk_index: int
 
 
-def retrieve(query: str, top_k: int = 5) -> list[RetrievedChunk]:
+def retrieve(query: str, top_k: int = 5, document_ids: list[str] = None) -> list[RetrievedChunk]:
     """
-    Embeds a user's question and searches ChromaDB for the most similar chunks.
-    Returns a clean list of RetrievedChunk objects, not ChromaDB's raw format.
+    Embeds a query and searches for similar chunks, optionally scoped
+    to specific document_ids only.
     """
     query_embedding = embed_texts([query])[0]
-    raw_results = query_vectors(query_embedding, top_k=top_k)
+    raw_results = query_vectors(query_embedding, top_k=top_k, document_ids=document_ids)
 
-    # ChromaDB returns everything as lists-of-lists (one outer list per query embedding;
-    # we only ever send one query at a time, so we always index [0])
     documents = raw_results["documents"][0]
     metadatas = raw_results["metadatas"][0]
     distances = raw_results["distances"][0]

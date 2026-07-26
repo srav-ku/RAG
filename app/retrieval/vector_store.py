@@ -6,12 +6,6 @@ _collection = None
 
 
 def get_collection():
-    """
-    Returns the ChromaDB collection, connecting to the persistent
-    Drive-backed database on first call and reusing that connection after.
-    Explicitly configured to use cosine similarity, matching how our
-    embedding model (bge-small-en-v1.5) is designed to be compared.
-    """
     global _client, _collection
     if _collection is None:
         _client = chromadb.PersistentClient(path=CONFIG.chroma_dir)
@@ -28,7 +22,37 @@ def add_chunks(doc_id: str, chunk_texts: list[str], embeddings: list[list[float]
     collection.add(ids=ids, embeddings=embeddings, documents=chunk_texts, metadatas=metadatas)
 
 
-def query_vectors(query_embedding: list[float], top_k: int = 5):
+def query_vectors(query_embedding: list[float], top_k: int = 5, document_ids: list[str] = None):
+    """
+    Searches for similar chunks. If document_ids is provided, only searches
+    within those specific documents (metadata filtering) instead of the
+    whole collection.
+    """
     collection = get_collection()
-    results = collection.query(query_embeddings=[query_embedding], n_results=top_k)
+
+    where_filter = None
+    if document_ids:
+        # ChromaDB's filter syntax: match any document_id in this list
+        where_filter = {"document_id": {"$in": document_ids}}
+
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_k,
+        where=where_filter
+    )
     return results
+
+
+def get_all_chunks_for_documents(document_ids: list[str] = None) -> dict:
+    """
+    Returns all chunks (documents + metadatas), optionally filtered to
+    specific document_ids. Used by keyword (BM25) search, which needs
+    the full text rather than a similarity query.
+    """
+    collection = get_collection()
+
+    if document_ids:
+        where_filter = {"document_id": {"$in": document_ids}}
+        return collection.get(where=where_filter)
+    else:
+        return collection.get()

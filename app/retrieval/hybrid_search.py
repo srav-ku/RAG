@@ -3,14 +3,13 @@ from app.retrieval.keyword_search import keyword_search
 from app.retrieval.reranker import rerank
 
 
-def hybrid_retrieve(query: str, top_k: int = 10, rrf_k: int = 60) -> list[RetrievedChunk]:
+def hybrid_retrieve(query: str, top_k: int = 10, rrf_k: int = 60, document_ids: list[str] = None) -> list[RetrievedChunk]:
     """
-    Combines semantic + keyword search via RRF to build a candidate pool,
-    then uses the cross-encoder reranker for final, accurate ordering.
-    RRF here is just for building a good candidate SET, not final ranking.
+    Combines semantic + keyword search via RRF, then reranks.
+    Optionally scoped to specific document_ids only.
     """
-    semantic_results = retrieve(query, top_k=top_k * 2)
-    keyword_results = keyword_search(query, top_k=top_k * 2)
+    semantic_results = retrieve(query, top_k=top_k * 2, document_ids=document_ids)
+    keyword_results = keyword_search(query, top_k=top_k * 2, document_ids=document_ids)
 
     chunk_lookup = {}
     rrf_scores = {}
@@ -33,10 +32,11 @@ def hybrid_retrieve(query: str, top_k: int = 10, rrf_k: int = 60) -> list[Retrie
             )
         rrf_scores[key] = rrf_scores.get(key, 0) + 1 / (rrf_k + rank + 1)
 
-    # Union of candidates from both methods - this is our pool, not final order
+    if not rrf_scores:
+        return []
+
     candidate_keys = list(rrf_scores.keys())
     candidates = [chunk_lookup[k] for k in candidate_keys]
 
-    # Let the cross-encoder make the real final judgment
     final_ranked = rerank(query, candidates)
     return final_ranked[:top_k]
