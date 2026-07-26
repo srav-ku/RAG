@@ -4,16 +4,14 @@ from app.generation.llm import generate_text
 from app.generation.citation import format_citations
 
 # Threshold validated against real test data (Step 20): relevant questions
-# scored 0.0163-0.1910, irrelevant scored 0.0000-0.0001 on the raw reranker
-# scale. Kept the same value since hybrid_retrieve() also ends with the
-# same reranker as its final step, so scores remain on the same scale.
+# scored 0.0163-0.1910, irrelevant scored 0.0000-0.0001 on the reranker scale.
 RELEVANCE_THRESHOLD = 0.005
 
 
 def answer_question(query: str, top_k: int = 5) -> dict:
     """
     Full query pipeline: hybrid retrieve (semantic + keyword + rerank),
-    check relevance, generate a grounded answer, and attach citations.
+    relevance check, grounded generation, citations.
     """
     best_chunks = hybrid_retrieve(query, top_k=top_k)
 
