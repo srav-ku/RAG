@@ -3,11 +3,10 @@ from app.retrieval.retriever import RetrievedChunk
 
 def build_prompt(query: str, chunks: list[RetrievedChunk]) -> str:
     """
-    Builds a grounded prompt: instructions + retrieved context + the user's question.
-    Designed to minimize hallucination by explicitly restricting the model
-    to only the provided context, and telling it what to do if the answer isn't there.
+    Builds a grounded prompt with hardened anti-fabrication instructions.
+    Explicitly addresses the case where context mentions a topic but lacks
+    the specific details being asked for (found via testing - Step 25).
     """
-    # Build the context block from retrieved chunks, numbered for clarity
     context_blocks = []
     for i, chunk in enumerate(chunks, start=1):
         context_blocks.append(f"[Source {i} - {chunk.filename}, page(s) {chunk.page_numbers}]\n{chunk.text}")
@@ -19,6 +18,7 @@ def build_prompt(query: str, chunks: list[RetrievedChunk]) -> str:
 Rules:
 - Only use information from the context below to answer.
 - If the context does not contain enough information to answer the question, say "I don't have enough information to answer that" - do not guess or use outside knowledge.
+- IMPORTANT: If the context only mentions that something exists or is used, but does NOT provide the specific details being asked for (such as step-by-step instructions, exact numbers, or configuration details), you MUST say the context does not include those specific details. Do NOT invent, assume, or fill in plausible-sounding specifics that are not explicitly written in the context.
 - Be concise and direct.
 - If you use information from a specific source, you may refer to it by its source number (e.g. "Source 1").
 
