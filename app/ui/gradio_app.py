@@ -1,7 +1,18 @@
-import gradio as gr
+import os
 import sys
 sys.path.append("/content/RAG")
 
+# Set model cache location BEFORE importing anything that loads models -
+# environment variables must be set before HF libraries read them, and
+# since this script runs as its own process, this must happen here,
+# not in a separate notebook cell (learned via testing - Step 32).
+from app.config import CONFIG
+if CONFIG.use_drive_model_cache:
+    os.makedirs(CONFIG.model_cache_dir, exist_ok=True)
+    os.environ["HF_HOME"] = CONFIG.model_cache_dir
+    print(f"[Cache] Using Drive model cache: {CONFIG.model_cache_dir}")
+
+import gradio as gr
 from app.pipeline.ingest_pipeline import ingest_document
 from app.pipeline.query_pipeline import answer_question
 from app.storage.db import init_db, list_documents
@@ -10,6 +21,10 @@ from app.storage.db import init_db, list_documents
 def handle_upload(file):
     if file is None:
         return "No file selected.", gr.update()
+
+    supported = (".pdf", ".txt", ".md", ".docx")
+    if not file.lower().endswith(supported):
+        return f"❌ Unsupported file type. Supported formats: {', '.join(supported)}", gr.update()
 
     with open(file, "rb") as f:
         file_bytes = f.read()
@@ -24,22 +39,15 @@ def handle_upload(file):
     else:
         msg = f"❌ {result['message']}"
 
-    # Refresh the document choices dropdown after every upload
     return msg, gr.update(choices=get_doc_choices())
 
 
 def get_doc_choices():
-    """Returns (label, value) pairs for the document selector, using filename
-    as the visible label and document_id as the actual value passed to filtering."""
     docs = list_documents()
     return [(d["filename"], d["id"]) for d in docs]
 
 
 def handle_chat(message, history, selected_doc_ids):
-    """
-    selected_doc_ids comes from the CheckboxGroup - a list of document_ids
-    the user checked. Empty list means "search all documents" (no filter).
-    """
     doc_filter = selected_doc_ids if selected_doc_ids else None
     result = answer_question(message, document_ids=doc_filter)
     response = result["answer"]
@@ -57,8 +65,6 @@ def list_documents_display():
 
 
 def refresh_doc_selector():
-    """Used by a manual refresh button on the Chat tab, in case a document
-    was uploaded in another tab/session without reloading the page."""
     return gr.update(choices=get_doc_choices())
 
 
@@ -66,7 +72,7 @@ with gr.Blocks(title="RAG Document Intelligence Platform") as demo:
     gr.Markdown("# RAG Document Intelligence Platform")
 
     with gr.Tab("Upload"):
-        file_input = gr.File(label="Upload a PDF")
+        file_input = gr.File(label="Upload a document (PDF, TXT, MD, DOCX)")
         upload_button = gr.Button("Process Document")
         upload_output = gr.Textbox(label="Status", lines=4)
 
@@ -78,17 +84,13 @@ with gr.Blocks(title="RAG Document Intelligence Platform") as demo:
             )
             refresh_selector_btn = gr.Button("Refresh document list", scale=0)
 
-        chatbot = gr.ChatInterface(
-            fn=handle_chat,
-            additional_inputs=[doc_selector]
-        )
+        chatbot = gr.ChatInterface(fn=handle_chat, additional_inputs=[doc_selector])
 
     with gr.Tab("Documents"):
         refresh_button = gr.Button("Refresh List")
         docs_output = gr.Textbox(label="Ingested Documents", lines=10)
         refresh_button.click(fn=list_documents_display, inputs=None, outputs=docs_output)
 
-    # Wire up events that touch components across tabs
     upload_button.click(fn=handle_upload, inputs=file_input, outputs=[upload_output, doc_selector])
     refresh_selector_btn.click(fn=refresh_doc_selector, inputs=None, outputs=doc_selector)
 
