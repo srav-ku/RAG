@@ -1,1 +1,415 @@
-<h1>API is running. Frontend coming next.</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Document Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1D1D1F;
+    --ink-secondary: #6E6E73;
+    --bg: #FAFAFA;
+    --surface: #FFFFFF;
+    --border: #E5E5E7;
+    --accent: #3B5BFB;
+    --accent-hover: #2E48D6;
+    --green: #1F9D55;
+    --amber: #B7791F;
+    --red: #C53030;
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 260px 1fr 1fr;
+    height: 100vh;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 28px 20px;
+    overflow-y: auto;
+  }
+  .brand-title { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+  .brand-subtitle { font-size: 13px; color: var(--ink-secondary); margin-top: 2px; margin-bottom: 24px; }
+
+  .stat-card {
+    background: #F5F5F7;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .stat-number { font-size: 22px; font-weight: 700; }
+  .stat-label { font-size: 12px; color: var(--ink-secondary); font-weight: 500; }
+
+  .section-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 24px 0 10px;
+  }
+
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 24px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .dropzone:hover, .dropzone.drag-over { border-color: var(--accent); background: #F3F5FF; }
+  .dropzone-icon { font-size: 20px; color: var(--ink-secondary); margin-bottom: 6px; }
+  .dropzone-text { font-size: 13px; color: var(--ink-secondary); }
+  .dropzone-text strong { color: var(--accent); font-weight: 600; }
+
+  .btn {
+    border: none;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease;
+  }
+  .btn-primary { background: var(--accent); color: white; width: 100%; margin-top: 12px; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--border); padding: 6px 10px; font-size: 12px; }
+  .btn-danger:hover { background: #FFF5F5; border-color: var(--red); }
+
+  .status-msg { font-size: 12px; color: var(--ink-secondary); margin-top: 10px; line-height: 1.4; }
+
+  /* MIDDLE PANEL - Knowledge Base */
+  .knowledge-panel {
+    padding: 28px 24px;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+  }
+  .panel-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+
+  .doc-table { width: 100%; border-collapse: collapse; }
+  .doc-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .doc-table td {
+    padding: 12px 10px;
+    font-size: 13.5px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .doc-name { font-weight: 500; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+  .badge-processed { color: var(--green); background: #E9F9EF; }
+  .badge-processed::before { background: var(--green); }
+  .badge-pending { color: var(--amber); background: #FDF3E3; }
+  .badge-pending::before { background: var(--amber); }
+  .badge-failed { color: var(--red); background: #FDECEC; }
+  .badge-failed::before { background: var(--red); }
+
+  .empty-state { color: var(--ink-secondary); font-size: 13.5px; padding: 24px 10px; text-align: center; }
+
+  /* RIGHT PANEL - Chat */
+  .chat-panel { display: flex; flex-direction: column; height: 100vh; }
+  .chat-header { padding: 28px 24px 16px; border-bottom: 1px solid var(--border); }
+  .scope-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .scope-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    user-select: none;
+  }
+  .scope-chip.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+  .chat-messages { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 88%; padding: 12px 15px; font-size: 14px; line-height: 1.5; animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .msg-user { align-self: flex-end; background: var(--accent); color: white; border-radius: 16px 16px 4px 16px; }
+  .msg-bot { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: 16px 16px 16px 4px; }
+  .msg-source { display: block; margin-top: 8px; font-size: 12px; color: var(--ink-secondary); border-top: 1px solid var(--border); padding-top: 8px; }
+  .msg-loading { align-self: flex-start; color: var(--ink-secondary); font-size: 13px; font-style: italic; }
+
+  .chat-input-area { padding: 16px 24px 20px; border-top: 1px solid var(--border); }
+  .chat-input-row { display: flex; gap: 10px; }
+  .chat-input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+  }
+  .chat-input:focus { border-color: var(--accent); }
+  .send-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    width: 44px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  .send-btn:hover { background: var(--accent-hover); }
+  .disclaimer { font-size: 11px; color: var(--ink-secondary); text-align: center; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand-title">Document Intelligence</div>
+    <div class="brand-subtitle">Grounded Q&A over your documents</div>
+
+    <div id="stats"></div>
+
+    <div class="section-label">Add a document</div>
+    <div class="dropzone" id="dropzone">
+      <div class="dropzone-icon">&#8593;</div>
+      <div class="dropzone-text"><strong>Click to upload</strong> or drag a file</div>
+      <div class="dropzone-text" style="margin-top:4px; font-size:11px;">PDF, TXT, MD, DOCX</div>
+    </div>
+    <input type="file" id="fileInput" style="display:none" accept=".pdf,.txt,.md,.docx">
+    <button class="btn btn-primary" id="uploadBtn" disabled>Process document</button>
+    <div class="status-msg" id="uploadStatus"></div>
+  </div>
+
+  <!-- KNOWLEDGE BASE -->
+  <div class="knowledge-panel">
+    <div class="panel-title">Knowledge Base</div>
+    <table class="doc-table" id="docTable">
+      <thead>
+        <tr><th>Document</th><th>Status</th><th>Pages</th><th></th></tr>
+      </thead>
+      <tbody id="docTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- CHAT -->
+  <div class="chat-panel">
+    <div class="chat-header">
+      <div class="panel-title" style="margin-bottom:4px;">Ask</div>
+      <div style="font-size:12.5px; color:var(--ink-secondary);">Tap documents below to search only those, or leave all unselected to search everything.</div>
+      <div class="scope-list" id="scopeList"></div>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg msg-bot">Ask a question about your uploaded documents. I'll answer using only what's actually in them, with citations.</div>
+    </div>
+    <div class="chat-input-area">
+      <div class="chat-input-row">
+        <input type="text" class="chat-input" id="chatInput" placeholder="Ask a question about your documents...">
+        <button class="send-btn" id="sendBtn">&#10148;</button>
+      </div>
+      <div class="disclaimer">Answers are grounded in your uploaded documents and may be incomplete.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "";
+let selectedScope = new Set();
+let pendingFile = null;
+
+async function fetchDocuments() {
+  const res = await fetch(`${API}/api/documents`);
+  const data = await res.json();
+  return data.documents;
+}
+
+function renderStats(docs) {
+  const totalPages = docs.reduce((sum, d) => sum + (d.page_count || 0), 0);
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="stat-number">${docs.length}</div><div class="stat-label">Documents indexed</div></div>
+    <div class="stat-card"><div class="stat-number">${totalPages}</div><div class="stat-label">Total pages processed</div></div>
+  `;
+}
+
+function badgeHtml(status) {
+  const map = { processed: ['badge-processed', 'Processed'], pending: ['badge-pending', 'Pending'], failed: ['badge-failed', 'Failed'] };
+  const [cls, label] = map[status] || ['badge-pending', status];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function renderTable(docs) {
+  const body = document.getElementById('docTableBody');
+  if (docs.length === 0) {
+    body.innerHTML = `<tr><td colspan="4"><div class="empty-state">No documents yet. Upload one to get started.</div></td></tr>`;
+    return;
+  }
+  body.innerHTML = docs.map(d => `
+    <tr>
+      <td class="doc-name">${d.filename}</td>
+      <td>${badgeHtml(d.status)}</td>
+      <td>${d.page_count ?? '—'}</td>
+      <td><button class="btn-danger" onclick="handleDelete('${d.id}')">Delete</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderScope(docs) {
+  const list = document.getElementById('scopeList');
+  if (docs.length === 0) { list.innerHTML = ''; return; }
+  list.innerHTML = docs.map(d => `
+    <div class="scope-chip ${selectedScope.has(d.id) ? 'active' : ''}" onclick="toggleScope('${d.id}')">${d.filename}</div>
+  `).join('');
+}
+
+function toggleScope(id) {
+  if (selectedScope.has(id)) selectedScope.delete(id); else selectedScope.add(id);
+  refreshAll();
+}
+
+async function refreshAll() {
+  const docs = await fetchDocuments();
+  renderStats(docs);
+  renderTable(docs);
+  renderScope(docs);
+}
+
+async function handleDelete(id) {
+  await fetch(`${API}/api/documents/${id}`, { method: 'DELETE' });
+  selectedScope.delete(id);
+  refreshAll();
+}
+
+// Upload handling
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const uploadBtn = document.getElementById('uploadBtn');
+const uploadStatus = document.getElementById('uploadStatus');
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) setPendingFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) setPendingFile(fileInput.files[0]);
+});
+
+function setPendingFile(file) {
+  pendingFile = file;
+  uploadBtn.disabled = false;
+  uploadStatus.textContent = `Selected: ${file.name}`;
+}
+
+uploadBtn.addEventListener('click', async () => {
+  if (!pendingFile) return;
+  uploadBtn.disabled = true;
+  uploadStatus.textContent = 'Processing... this can take a moment.';
+
+  const formData = new FormData();
+  formData.append('file', pendingFile);
+
+  try {
+    const res = await fetch(`${API}/api/upload`, { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.status === 'processed') {
+      uploadStatus.textContent = `Processed — ${data.page_count} pages, ${data.chunk_count} chunks.`;
+    } else {
+      uploadStatus.textContent = data.message || 'Something went wrong.';
+    }
+  } catch (err) {
+    uploadStatus.textContent = 'Upload failed: ' + err.message;
+  }
+
+  pendingFile = null;
+  fileInput.value = '';
+  refreshAll();
+});
+
+// Chat handling
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function addMessage(text, sender, sources) {
+  const div = document.createElement('div');
+  div.className = `msg msg-${sender}`;
+  div.textContent = text;
+  if (sources) {
+    const src = document.createElement('span');
+    src.className = 'msg-source';
+    src.textContent = 'Source: ' + sources;
+    div.appendChild(src);
+  }
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return div;
+}
+
+async function sendMessage() {
+  const question = chatInput.value.trim();
+  if (!question) return;
+  addMessage(question, 'user');
+  chatInput.value = '';
+
+  const loading = document.createElement('div');
+  loading.className = 'msg msg-loading';
+  loading.textContent = 'Thinking...';
+  chatMessages.appendChild(loading);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  const formData = new FormData();
+  formData.append('question', question);
+  if (selectedScope.size > 0) formData.append('document_ids', Array.from(selectedScope).join(','));
+
+  try {
+    const res = await fetch(`${API}/api/ask`, { method: 'POST', body: formData });
+    const data = await res.json();
+    loading.remove();
+    addMessage(data.answer, 'bot', data.was_answered ? data.sources : null);
+  } catch (err) {
+    loading.remove();
+    addMessage('Something went wrong: ' + err.message, 'bot');
+  }
+}
+
+sendBtn.addEventListener('click', sendMessage);
+chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+refreshAll();
+</script>
+</body>
+</html>
