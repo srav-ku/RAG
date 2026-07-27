@@ -8,35 +8,40 @@ from app.storage.db import init_db, list_documents
 
 
 def handle_upload(file):
-    """
-    Called when a user uploads a file in the Upload tab.
-    Gradio gives us a filepath (str) for the uploaded temp file.
-    """
     if file is None:
-        return "No file selected."
+        return "No file selected.", gr.update()
 
     with open(file, "rb") as f:
         file_bytes = f.read()
 
-    filename = file.split("/")[-1]  # just the filename, not the full temp path
+    filename = file.split("/")[-1]
     result = ingest_document(file_bytes, filename)
 
     if result["status"] == "processed":
-        return f"✅ Successfully processed '{filename}'\nPages: {result['page_count']} | Chunks created: {result['chunk_count']}"
+        msg = f"✅ Successfully processed '{filename}'\nPages: {result['page_count']} | Chunks created: {result['chunk_count']}"
     elif result["status"] == "duplicate":
-        return f"⚠️ {result['message']}"
+        msg = f"⚠️ {result['message']}"
     else:
-        return f"❌ {result['message']}"
+        msg = f"❌ {result['message']}"
+
+    # Refresh the document choices dropdown after every upload
+    return msg, gr.update(choices=get_doc_choices())
 
 
-def handle_chat(message, history):
+def get_doc_choices():
+    """Returns (label, value) pairs for the document selector, using filename
+    as the visible label and document_id as the actual value passed to filtering."""
+    docs = list_documents()
+    return [(d["filename"], d["id"]) for d in docs]
+
+
+def handle_chat(message, history, selected_doc_ids):
     """
-    Called when a user sends a message in the Chat tab.
-    `history` is Gradio's running conversation list - we don't use it in our
-    logic yet (each question is answered independently), but Gradio requires
-    this function signature for its Chatbot component.
+    selected_doc_ids comes from the CheckboxGroup - a list of document_ids
+    the user checked. Empty list means "search all documents" (no filter).
     """
-    result = answer_question(message)
+    doc_filter = selected_doc_ids if selected_doc_ids else None
+    result = answer_question(message, document_ids=doc_filter)
     response = result["answer"]
     if result["was_answered"]:
         response += f"\n\n**Sources:**\n{result['sources']}"
@@ -44,18 +49,19 @@ def handle_chat(message, history):
 
 
 def list_documents_display():
-    """Returns a simple text summary of ingested documents, for the Documents tab."""
     docs = list_documents()
     if not docs:
         return "No documents uploaded yet."
-
-    lines = []
-    for d in docs:
-        lines.append(f"- {d['filename']} | status: {d['status']} | pages: {d['page_count']}")
+    lines = [f"- {d['filename']} | status: {d['status']} | pages: {d['page_count']}" for d in docs]
     return "\n".join(lines)
 
 
-# Build the app
+def refresh_doc_selector():
+    """Used by a manual refresh button on the Chat tab, in case a document
+    was uploaded in another tab/session without reloading the page."""
+    return gr.update(choices=get_doc_choices())
+
+
 with gr.Blocks(title="RAG Document Intelligence Platform") as demo:
     gr.Markdown("# RAG Document Intelligence Platform")
 
@@ -63,15 +69,28 @@ with gr.Blocks(title="RAG Document Intelligence Platform") as demo:
         file_input = gr.File(label="Upload a PDF")
         upload_button = gr.Button("Process Document")
         upload_output = gr.Textbox(label="Status", lines=4)
-        upload_button.click(fn=handle_upload, inputs=file_input, outputs=upload_output)
 
     with gr.Tab("Chat"):
-        chatbot = gr.ChatInterface(fn=handle_chat)
+        with gr.Row():
+            doc_selector = gr.CheckboxGroup(
+                choices=get_doc_choices(),
+                label="Search only these documents (leave empty to search all)"
+            )
+            refresh_selector_btn = gr.Button("Refresh document list", scale=0)
+
+        chatbot = gr.ChatInterface(
+            fn=handle_chat,
+            additional_inputs=[doc_selector]
+        )
 
     with gr.Tab("Documents"):
         refresh_button = gr.Button("Refresh List")
         docs_output = gr.Textbox(label="Ingested Documents", lines=10)
         refresh_button.click(fn=list_documents_display, inputs=None, outputs=docs_output)
+
+    # Wire up events that touch components across tabs
+    upload_button.click(fn=handle_upload, inputs=file_input, outputs=[upload_output, doc_selector])
+    refresh_selector_btn.click(fn=refresh_doc_selector, inputs=None, outputs=doc_selector)
 
 
 if __name__ == "__main__":
